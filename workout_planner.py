@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 st.set_page_config(layout= 'wide')
 st.title('Intervals Testing')
-st.write('testing')
+
 # --- Secrets / config ---
 def get_api_key() -> str:
     # Prefer Streamlit secrets, fall back to env var for non-Streamlit hosts
