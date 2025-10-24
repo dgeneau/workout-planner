@@ -6,7 +6,7 @@ Pulling from the 'intervals.icu' API
 '''
 
 
-API_KEY = 'wqot62gf851at7ygdvaqp57l'
+
 
 
 
