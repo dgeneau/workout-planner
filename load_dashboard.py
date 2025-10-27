@@ -112,8 +112,6 @@ def fetch_planned(athlete_id, oldest, newest):
 athlete_id = athlete_dict[athlete_name]
 act_df = fetch_actual(athlete_id, oldest, newest)
 evt_df = fetch_planned(athlete_id, oldest, newest)
-st.write(act_df)
-st.write(evt_df)
 if len(evt_df)>0:
     evt_df["workout_doc.distance"] = evt_df["workout_doc.distance"] /1000
     evt_df["workout_doc.duration"] = evt_df["workout_doc.duration"]/60
@@ -154,6 +152,9 @@ METRICS = {
     "load":     {"label": "Load",           "planned": "load_planned",        "actual": "load_actual"},
 }
 METRIC_ORDER = ["distance", "duration", "load"]  # controls column order
+
+
+
 
 SPORT_COLORS = {
     "Rowing": "blue",
@@ -207,6 +208,111 @@ sel_sports = st.multiselect("Filter modalities", options=all_sports, default=all
 # apply filter once per metric
 plot_metric = {m: dfm[dfm["sport"].isin(sel_sports)].copy() for m, dfm in per_metric.items()}
 
+st.write(plot_metric)
+
+
+###############
+PALETTE = ["#1f77b4","#ff7f0e","#2ca02c","#d62728",
+           "#9467bd","#8c564b","#e377c2","#7f7f7f",
+           "#bcbd22","#17becf"]
+
+# all sports present across metrics (after your filter)
+all_sports_present = sorted(
+    set().union(*[dfm["sport"].dropna().unique() for dfm in plot_metric.values()])
+)
+#sport_to_color = {s: PALETTE[i % len(PALETTE)] for i, s in enumerate(all_sports_present)}
+sport_to_color = {'Other': PALETTE[7], 
+                  'VirtualRide': PALETTE[8], 
+                  'VirtualRow': PALETTE[0], 
+                  'Row': PALETTE[3], 
+                  'WeightTraining': PALETTE[2], 
+                  'Run': PALETTE[6], 
+                  'HighIntensityIntervalTraining':PALETTE[1], 
+                  'Pickleball': PALETTE[9]}
+
+# y categories (dates) — union across metrics, sorted, to keep rows aligned
+all_dates = sorted(
+    set().union(*[pd.to_datetime(dfm["start_day"]).tolist() for dfm in plot_metric.values() if not dfm.empty])
+)
+
+# x-max per metric so both Planned & Actual columns use the same range
+xmax_by_metric = {}
+for m, dfm in plot_metric.items():
+    if dfm.empty:
+        xmax_by_metric[m] = 0.0
+    else:
+        xmax_by_metric[m] = float(dfm[["planned", "actual"]].max().max())
+
+# build figure: 3 rows (metrics), 2 cols (Planned, Actual)
+col_labels = ["Planned", "Actual"]
+row_labels = [METRICS[m]["label"] for m in METRIC_ORDER]
+
+fig = make_subplots(
+    rows=len(METRIC_ORDER),
+    cols=2,
+    shared_yaxes=True,
+    horizontal_spacing=0.10,
+    vertical_spacing=0.06,
+    column_titles=col_labels,
+    row_titles=row_labels,
+)
+
+# add stacked bars: for each metric row, add one trace per sport in each column
+for r, m in enumerate(METRIC_ORDER, start=1):
+    dfm = plot_metric[m].copy()
+    if not dfm.empty:
+        dfm["start_day"] = pd.to_datetime(dfm["start_day"])
+    # Build a tidy per-sport slice once to reuse in both columns
+    for c, which in enumerate(["planned", "actual"], start=1):
+        # first cell shows legend only
+        show_leg = (r == 1 and c == 1)
+
+        for s in all_sports_present:
+            sub = dfm[dfm["sport"] == s]
+            # If a sport has no data for this metric, add an empty trace to keep legend color consistent
+            y_vals = sub["start_day"] if not sub.empty else []
+            x_vals = sub[which] if not sub.empty else []
+
+            fig.add_trace(
+                go.Bar(
+                    y=y_vals,
+                    x=x_vals,
+                    name=s,
+                    legendgroup=s,
+                    showlegend=show_leg,
+                    marker=dict(color=sport_to_color[s]),
+                    orientation="h",
+                ),
+                row=r, col=c
+            )
+
+        # consistent x range per metric across both columns
+        xr = xmax_by_metric[m] * 1.10 if xmax_by_metric[m] > 0 else 1.0
+        fig.update_xaxes(range=[0, xr], row=r, col=c)
+
+# make all y-axes share the same ordered categories (dates)
+for r in range(1, len(METRIC_ORDER) + 1):
+    for c in range(1, 3):
+        fig.update_yaxes(
+            type="category",
+            categoryorder="array",
+            categoryarray=all_dates,  # keeps date row order consistent
+            row=r, col=c
+        )
+
+# layout: stacked bars
+fig.update_layout(
+    barmode="stack",
+    height=max(540, 220 * len(all_dates) * 0.35 + 220),  # adaptive height
+    margin=dict(t=90, b=40, l=60, r=30),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
+_='''
+
 # early out if everything is empty after filtering
 if all(dfm.empty for dfm in plot_metric.values()):
     st.info("No data for the selected window/modalities.")
@@ -231,7 +337,7 @@ else:
             sub = plot_metric[m][plot_metric[m]["sport"] == s]
             # Only show legend once (top-left subplot) to avoid duplicates
             show_leg = (r == 1 and c == 1)
-            _='''
+            
             fig.add_trace(
                 go.Bar(
                     y=sub["start_day"],
@@ -246,24 +352,25 @@ else:
                 ),
                 row=r, col=c
             )
-            '''
+            
             fig.add_trace(
                 go.Bar(
                     y=sub["start_day"],
-                    x=sub["actual"]/sub['planned']*100,
+                    x=sub["actual"]/sub['planned'],
                     name="Percent Completion",
                     legendgroup="Actual",
                     showlegend=show_leg,
                     opacity=0.95,
                     orientation="h",
                     marker=dict(color=color),
+
                   
                 ),
                 row=r, col=c
             )
 
     fig.update_layout(
-        barmode="group",
+        barmode="stack",
         height=max(420, 240 * len(sports_order)),
         margin=dict(t=90, b=40, l=60, r=30),
     )
@@ -283,55 +390,4 @@ with st.expander("Raw data (debug)"):
     st.write("Events (planned):", evt_df.head(10))
     for m in METRIC_ORDER:
         st.write(f"Merged daily – {METRICS[m]['label']}:", per_metric[m].head(10))
-
-
-_='''
-if plot_df.empty:
-    st.info("No data for the selected window/modalities.")
-else:
-    sports_order = sorted(plot_df["sport"].unique())
-    fig = make_subplots(
-        rows=len(sports_order),
-        cols=1,
-        shared_xaxes=True,
-        subplot_titles=[f"{s}" for s in sports_order],
-        vertical_spacing=0.1,
-    )
-
-    for r, s in enumerate(sports_order, start=1):
-        if s == 'Rowing': 
-            color = 'blue'
-        elif s == 'VirtualRow': 
-            color = 'red'
-        elif s == 'WeightTraining': 
-            color = 'green'
-
-        else: 
-            color = 'purple'
-        sub = plot_df[plot_df["sport"] == s]
-        fig.add_trace(go.Bar(
-            y=sub["start_day"], x=sub["planned"],
-            name=f"{s} — Planned", legendgroup=s, showlegend=(True), opacity=0.3, 
-            orientation='h',
-            marker = dict(color = color)
-        ), row=r, col=1)
-        fig.add_trace(go.Bar(
-            y=sub["start_day"], x=sub["actual"],
-            name=f"{s} — Actual", legendgroup=s, showlegend=(True), opacity=1, 
-            orientation='h',
-            marker = dict(color = color)
-        ), row=r, col=1)
-
-    fig.update_layout(
-        barmode="overlay",
-        height=max(360, 220 * len(sports_order)),
-        #margin=dict(t=60, b=40, l=40, r=20),
-        #xaxis_title="Date",
-        yaxis_title=metric,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-with st.expander("Raw data (debug)"):
-    st.write("Activities (actual):", act_df.head(10))
-    st.write("Events (planned):", evt_df.head(10))
 '''
