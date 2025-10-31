@@ -105,7 +105,7 @@ athlete_ids = [athlete_dict[name] for name in athlete_list]
 d1, d2, d3, d4, d5, d6, d7 = st.columns(7)
 activity_dict = {'Rowing': 'Rowing', 
                  'Ergometer': 'VirtualRow', 
-                 'Ride': 'Ride', 
+                 'Bike': 'Ride', 
                  'Run': 'Run',
                  'XT': 'Crossfit',
                  'Weights': 'WeightTraining', 

@@ -17,7 +17,8 @@ import math
 st.set_page_config(layout= 'wide')
 st.title('Intervals Load Monitoring')
 
-API_KEY = 'wqot62gf851at7ygdvaqp57l'
+#API_KEY = 'wqot62gf851at7ygdvaqp57l'
+API_KEY = '69yu8aiqme8lwh0v20vg3lbrm'
 
 client = IntervalsICUClient(api_key=API_KEY)
 
