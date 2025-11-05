@@ -65,17 +65,14 @@ TZ = ZoneInfo("America/Vancouver")
 
 st.header('Push Workouts to Intervals')
 
-def next_monday(today=None):
+def current_monday(today=None):
     today = today or datetime.now(TZ).date()
     # weekday(): Mon=0 ... Sun=6
-    days_to_next_mon = 7 - today.weekday()
-    if days_to_next_mon == 0:  # today is Monday -> "upcoming" means next week
-        days_to_next_mon = 7
-    return today + timedelta(days=days_to_next_mon)
+    days_since_mon = today.weekday()
+    return today - timedelta(days=days_since_mon)
 
 def week_label(monday_date):
     sunday = monday_date + timedelta(days=6)
-    # e.g., "Week of Mon Oct 20 → Sun Oct 26 (ISO 2025-43)"
     iso_year, iso_week, _ = monday_date.isocalendar()
     return f"Week of {monday_date:%a %b %d} → {sunday:%a %b %d} (ISO {iso_year}-{iso_week:02d})"
 
@@ -83,8 +80,8 @@ def week_days(monday_date):
     names = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
     return {names[i]: (monday_date + timedelta(days=i)) for i in range(7)}
 
-# Build the options: upcoming week + next 11
-first_monday = next_monday()
+# Build the options: current week + next 11
+first_monday = current_monday()
 monday_options = [first_monday + timedelta(weeks=i) for i in range(12)]
 labels = [week_label(m) for m in monday_options]
 
